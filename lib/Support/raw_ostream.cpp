@@ -465,8 +465,7 @@ void format_object_base::home() {
 static int getFD(StringRef Filename, std::error_code &EC,
                  sys::fs::OpenFlags Flags) {
   // Handle "-" as stdout. Note that when we do this, we consider ourself
-  // the owner of stdout. This means that we can do things like close the
-  // file descriptor when we're done and set the "binary" flag globally.
+  // the owner of stdout and may set the "binary" flag globally based on Flags.
   if (Filename == "-") {
     EC = std::error_code();
     // If user requested binary then put stdout into binary mode if
@@ -497,6 +496,13 @@ raw_fd_ostream::raw_fd_ostream(int fd, bool shouldClose, bool unbuffered)
     ShouldClose = false;
     return;
   }
+  // We do not want to close STDOUT as there may have been several uses of it
+  // such as the case: llc %s -o=- -pass-remarks-output=- -filetype=asm
+  // which cause multiple closes of STDOUT_FILENO and/or use-after-close of it.
+  // Using dup() in getFD doesn't work as we end up with original STDOUT_FILENO
+  // open anyhow.
+  if (FD <= STDERR_FILENO)
+    ShouldClose = false;
 
   // Get the starting position.
   off_t loc = ::lseek(FD, 0, SEEK_CUR);
@@ -542,7 +548,11 @@ void raw_fd_ostream::write_impl(const char *Ptr, size_t Size) {
   pos += Size;
 
 #ifndef LLVM_ON_WIN32
+#if defined(__linux__)
+  bool ShouldWriteInChunks = true;
+#else
   bool ShouldWriteInChunks = false;
+#endif
 #else
   // Writing a large size of output to Windows console returns ENOMEM. It seems
   // that, prior to Windows 8, WriteFile() is redirecting to WriteConsole(), and
