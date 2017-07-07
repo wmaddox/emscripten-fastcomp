@@ -3089,8 +3089,8 @@ void JSWriter::printFunctionBody(const Function *F) {
   Relooper::MakeOutputBuffer(1024*1024);
   Relooper R;
   //if (!canReloop(F)) R.SetEmulate(true);
-  if (F->getAttributes().hasAttribute(AttributeSet::FunctionIndex, Attribute::MinSize) ||
-      F->getAttributes().hasAttribute(AttributeSet::FunctionIndex, Attribute::OptimizeForSize)) {
+  if (F->getAttributes().hasAttribute(AttributeList::FunctionIndex, Attribute::MinSize) ||
+      F->getAttributes().hasAttribute(AttributeList::FunctionIndex, Attribute::OptimizeForSize)) {
     R.SetMinSize(true);
   }
   R.SetAsmJSMode(1);
@@ -4339,8 +4339,7 @@ Pass *createCheckTriplePass() {
 bool JSTargetMachine::addPassesToEmitFile(
       PassManagerBase &PM, raw_pwrite_stream &Out, CodeGenFileType FileType,
       bool DisableVerify, AnalysisID StartBefore,
-      AnalysisID StartAfter, AnalysisID StopBefore, AnalysisID StopAfter,
-      MachineFunctionInitializer *MFInitializer) {
+      AnalysisID StartAfter, AnalysisID StopBefore, AnalysisID StopAfter) {
   assert(FileType == TargetMachine::CGFT_AssemblyFile);
 
   PM.add(createCheckTriplePass());
