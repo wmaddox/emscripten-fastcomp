@@ -61,9 +61,9 @@ public:
   }
 */
 
-  bool hasBranchDivergence() { return true; }
+  bool hasBranchDivergence() const { return true; }
 
-  void getUnrollingPreferences(Loop *L, TTI::UnrollingPreferences &UP);
+  void getUnrollingPreferences(Loop *L, TTI::UnrollingPreferences &UP) const;
 
   TTI::PopcntSupportKind getPopcntSupport(
       unsigned TyWidth) {
@@ -72,9 +72,9 @@ public:
     return TargetTransformInfo::PSK_Software;
   }
 
-  unsigned getNumberOfRegisters(bool Vector);
+  unsigned getNumberOfRegisters(bool Vector) const;
 
-  unsigned getRegisterBitWidth(bool Vector);
+  unsigned getRegisterBitWidth(bool Vector) const;
 
   unsigned getArithmeticInstrCost(
       unsigned Opcode, Type *Ty,
@@ -84,12 +84,12 @@ public:
       TTI::OperandValueProperties Opd2PropInfo = TTI::OP_None,
       ArrayRef<const Value*> Args = {});
 
-  unsigned getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Index);
+  unsigned getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Index) const;
 
   unsigned getMemoryOpCost(unsigned Opcode, Type *Src, unsigned Alignment,
-                           unsigned AddressSpace);
+                           unsigned AddressSpace, const Instruction* I = nullptr) const;
 
-  unsigned getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src);
+  unsigned getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src, const Instruction* I = nullptr) const;
 };
 
 } // end namespace llvm
