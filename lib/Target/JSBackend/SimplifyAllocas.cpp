@@ -79,7 +79,7 @@ bool SimplifyAllocas::runOnFunction(Function &Func) {
       }
       if (!Fail && Aliases.size() > 0 && ActualType) {
         // success, replace the alloca and the bitcast aliases with a single simple alloca
-        AllocaInst *NA = new AllocaInst(ActualType, ConstantInt::get(i32, 1), "", I);
+        AllocaInst *NA = new AllocaInst(ActualType, 1, "", I);
         NA->takeName(AI);
         NA->setAlignment(AI->getAlignment());
         NA->setDebugLoc(AI->getDebugLoc());

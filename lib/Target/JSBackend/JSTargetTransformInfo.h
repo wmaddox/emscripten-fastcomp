@@ -84,12 +84,12 @@ public:
       TTI::OperandValueProperties Opd2PropInfo = TTI::OP_None,
       ArrayRef<const Value*> Args = {});
 
-  unsigned getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Index) const;
+  unsigned getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Index);
 
   unsigned getMemoryOpCost(unsigned Opcode, Type *Src, unsigned Alignment,
-                           unsigned AddressSpace, const Instruction* I = nullptr) const;
+                           unsigned AddressSpace, const Instruction* I = nullptr);
 
-  unsigned getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src, const Instruction* I = nullptr) const;
+  unsigned getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src, const Instruction* I = nullptr);
 };
 
 } // end namespace llvm

@@ -29,19 +29,19 @@ using namespace llvm;
 #define DEBUG_TYPE "JStti"
 
 void JSTTIImpl::getUnrollingPreferences(Loop *L,
-                                            TTI::UnrollingPreferences &UP) {
+                                            TTI::UnrollingPreferences &UP) const {
   // We generally don't want a lot of unrolling.
   UP.Partial = false;
   UP.Runtime = false;
 }
 
-unsigned JSTTIImpl::getNumberOfRegisters(bool Vector) {
+unsigned JSTTIImpl::getNumberOfRegisters(bool Vector) const {
   if (Vector) return 16; // like NEON, x86_64, etc.
 
   return 8; // like x86, thumb, etc.
 }
 
-unsigned JSTTIImpl::getRegisterBitWidth(bool Vector) {
+unsigned JSTTIImpl::getRegisterBitWidth(bool Vector) const {
   if (Vector) {
     return 128;
   }
@@ -105,17 +105,17 @@ unsigned JSTTIImpl::getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Inde
 
 
 unsigned JSTTIImpl::getMemoryOpCost(unsigned Opcode, Type *Src, unsigned Alignment,
-                                    unsigned AddressSpace) {
+                                    unsigned AddressSpace, const Instruction* I) {
   if (!isOkType(Src))
     return Nope;
 
-  return BasicTTIImplBase::getMemoryOpCost(Opcode, Src, Alignment, AddressSpace);
+  return BasicTTIImplBase::getMemoryOpCost(Opcode, Src, Alignment, AddressSpace, I);
 }
 
-unsigned JSTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src) {
+unsigned JSTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src, const Instruction* I) {
   if (!isOkType(Src) || !isOkType(Dst))
     return Nope;
 
-  return BasicTTIImplBase::getCastInstrCost(Opcode, Dst, Src);
+  return BasicTTIImplBase::getCastInstrCost(Opcode, Dst, Src, I);
 }
 
