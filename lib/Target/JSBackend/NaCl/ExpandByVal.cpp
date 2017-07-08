@@ -71,30 +71,25 @@ INITIALIZE_PASS(ExpandByVal, "expand-byval",
 // convoluted route to removing this attribute by recreating the
 // AttributeSet.
 AttributeSet RemoveAttrs(LLVMContext &Context, AttributeSet Attrs) {
-  SmallVector<AttributeSet, 8> AttrList;
-  for (unsigned Slot = 0; Slot < Attrs.getNumSlots(); ++Slot) {
-    unsigned Index = Attrs.getSlotIndex(Slot);
-    AttrBuilder AB;
-    for (AttributeSet::iterator Attr = Attrs.begin(Slot), E = Attrs.end(Slot);
-         Attr != E; ++Attr) {
-      if (Attr->isEnumAttribute() &&
-          Attr->getKindAsEnum() != Attribute::ByVal &&
-          Attr->getKindAsEnum() != Attribute::StructRet) {
-        AB.addAttribute(*Attr);
-      }
-      // IR semantics require that ByVal implies NoAlias.  However, IR
-      // semantics do not require StructRet to imply NoAlias.  For
-      // example, a global variable address can be passed as a
-      // StructRet argument, although Clang does not do so and Clang
-      // explicitly adds NoAlias to StructRet arguments.
-      if (Attr->isEnumAttribute() &&
-          Attr->getKindAsEnum() == Attribute::ByVal) {
-        AB.addAttribute(Attribute::get(Context, Attribute::NoAlias));
-      }
+  SmallVector<Attribute, 8> Ret;
+  AttrBuilder AB;
+  for (auto Attr : Attrs) {
+    if (Attr.isEnumAttribute() &&
+        Attr.getKindAsEnum() != Attribute::ByVal &&
+        Attr.getKindAsEnum() != Attribute::StructRet) {
+      AB.addAttribute(Attr);
     }
-    AttrList.push_back(AttributeSet::get(Context, Index, AB));
+    // IR semantics require that ByVal implies NoAlias.  However, IR
+    // semantics do not require StructRet to imply NoAlias.  For
+    // example, a global variable address can be passed as a
+    // StructRet argument, although Clang does not do so and Clang
+    // explicitly adds NoAlias to StructRet arguments.
+    if (Attr.isEnumAttribute() &&
+        Attr.getKindAsEnum() == Attribute::ByVal) {
+      AB.addAttribute(Attribute::get(Context, Attribute::NoAlias));
+    }
   }
-  return AttributeSet::get(Context, AttrList);
+  return AttributeSet::get(Context, Ret);
 }
 
 // ExpandCall() can take a CallInst or an InvokeInst.  It returns

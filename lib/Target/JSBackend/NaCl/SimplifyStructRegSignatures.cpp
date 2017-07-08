@@ -237,17 +237,17 @@ static AttributeSet CopyArgAttributes(AttributeSet NewAttrs, LLVMContext &C,
   if (!NewArgTy) {
     const unsigned OldIndex = OldArg + 1;
     auto OldAttrs = From.getParamAttributes(OldIndex);
-    if (OldAttrs.getNumSlots() == 0) {
+    if (OldAttrs.getNumAttributes() == 0) {
       return NewAttrs;
     }
     // move the params to the new index position:
     unsigned OldSlot = 0;
-    for (; OldSlot < OldAttrs.getNumSlots(); ++OldSlot) {
+    for (; OldSlot < OldAttrs.getNumAttributes(); ++OldSlot) {
       if (OldAttrs.getSlotIndex(OldSlot) == OldIndex) {
         break;
       }
     }
-    assert(OldSlot != OldAttrs.getNumSlots());
+    assert(OldSlot != OldAttrs.getNumAttributes());
     AttrBuilder B(AttributeSet(), NewIndex);
     for (auto II = OldAttrs.begin(OldSlot), IE = OldAttrs.end(OldSlot);
          II != IE; ++II) {

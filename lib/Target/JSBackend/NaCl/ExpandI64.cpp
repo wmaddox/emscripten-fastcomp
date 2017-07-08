@@ -240,8 +240,8 @@ static Function *RecreateFunctionLegalized(Function *F, FunctionType *NewType) {
     if (!Attrs.hasAttributes(i)) continue;
     AttributeSet ParamAttrs = Attrs.getParamAttributes(i);
     AttrBuilder AB;
-    unsigned NumSlots = ParamAttrs.getNumSlots();
-    for (unsigned k = 0; k < NumSlots; k++) {
+    unsigned NumAttributes = ParamAttrs.getNumAttributes();
+    for (unsigned k = 0; k < NumAttributes; k++) {
       for (AttributeSet::iterator I = ParamAttrs.begin(k), E = ParamAttrs.end(k); I != E; I++) {
         AB.addAttribute(*I);
       }

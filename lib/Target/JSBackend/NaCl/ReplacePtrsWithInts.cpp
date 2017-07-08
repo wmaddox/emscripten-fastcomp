@@ -288,7 +288,7 @@ void FunctionConverter::eraseReplacedInstructions() {
 static AttributeSet RemovePointerAttrs(LLVMContext &Context,
                                        AttributeSet Attrs) {
   SmallVector<AttributeSet, 8> AttrList;
-  for (unsigned Slot = 0; Slot < Attrs.getNumSlots(); ++Slot) {
+  for (unsigned Slot = 0; Slot < Attrs.getNumAttributes(); ++Slot) {
     unsigned Index = Attrs.getSlotIndex(Slot);
     AttrBuilder AB;
     for (AttributeSet::iterator Attr = Attrs.begin(Slot), E = Attrs.end(Slot);

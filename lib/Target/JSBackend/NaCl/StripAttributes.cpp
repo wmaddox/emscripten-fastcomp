@@ -54,7 +54,7 @@ INITIALIZE_PASS(StripAttributes, "nacl-strip-attributes",
                 false, false)
 
 static void CheckAttributes(AttributeSet Attrs) {
-  for (unsigned Slot = 0; Slot < Attrs.getNumSlots(); ++Slot) {
+  for (unsigned Slot = 0; Slot < Attrs.getNumAttributes(); ++Slot) {
     for (AttributeSet::iterator Attr = Attrs.begin(Slot), E = Attrs.end(Slot);
          Attr != E; ++Attr) {
       if (!Attr->isEnumAttribute()) {
