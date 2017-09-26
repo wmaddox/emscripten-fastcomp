@@ -4278,6 +4278,12 @@ bool JSTargetMachine::addPassesToEmitFile(
   PM.add(createEmscriptenRemoveLLVMAssumePass());
   PM.add(createEmscriptenExpandBigSwitchesPass());
 
+  //###
+  //PM.add(createDemoteRegisterToMemoryPass());
+
+  //###
+  PM.add(createEmscriptenMakeStackTraceablePass());
+
   PM.add(new JSWriter(Out, OptLevel));
 
   return false;
