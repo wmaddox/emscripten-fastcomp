@@ -14,8 +14,6 @@
 //
 //===-----------------------------------------------------------------------===//
 
-//#include "OptPasses.h"
-
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
@@ -23,7 +21,6 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/CFG.h"
 #include "llvm/ADT/SetOperations.h"
-//#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/IR/BasicBlock.h"
@@ -36,11 +33,8 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Debug.h"
-//#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
-//#include "llvm/Transforms/Utils/BasicBlockUtils.h"	// FoldingSingleEntryPHINodes
-//#include "llvm/Transforms/Utils/Local.h"		// removeUnreachableBlocks
 
 #define DEBUG_TYPE "make-stack-traceable"
 
@@ -51,12 +45,14 @@
 // mirror stack slots, limiting their lifetime to that of the underlying LLVM virtual register.
 // This should allow Emscripten to reduce the number of slots that must actually be allocated.
 // Not only does this reduce the size of the frame on the linear memory stack, but it reduces
-// the number of variables in the generated asm.js code.
+// the number of variables in the generated asm.js
 #define ANNOTATE_MIRROR_LIFETIMES
 
 // Diagnostics
-//#define TRACE_MIRROR_LIFETIMES
 
+//#define TRACE_LIVENESS
+//#define TRACE_MIRROR_LIFETIMES
+//#define DUMP_FINAL_IR
 
 using namespace llvm;
 
@@ -70,7 +66,7 @@ struct MakeStackTraceable : public FunctionPass {
 
   bool runOnFunction(Function &F) override;
 
-  const char *getPassName() const override { return "MakeStackTraceable"; }
+  StringRef getPassName() const override { return StringRef("MakeStackTraceable"); }
 };
   
 char MakeStackTraceable::ID = 0;
@@ -237,36 +233,35 @@ static bool walkDominatorTree(DominatorTree &DT, Function &F)
     Instruction* Inst  = PP.CallInstruction;
 
     for (Value *V : SaveSet) {
-      if (auto *I = dyn_cast<Instruction>(V)) {
+      
+      // Create a mirror for the value if one does not already exist.
+      Value *Mirror = Mirrors[V];
+      if (!Mirror) {
+	assert(V->getType() && isGCPointerType(V->getType()));
+	// Insert a new AllocaInst at the start of the entry block, following any phi nodes.
+	IRBuilder<> IRB(&*F.getEntryBlock().getFirstInsertionPt());
+	Mirror = IRB.CreateAlloca(V->getType(), nullptr, "mirror");
+	dyn_cast<AllocaInst>(Mirror)->setAlignment(int32bytes);
+	Mirrors[V] = Mirror;
+      }	
 
-	// Create a mirror for the value if one does not already exist.
-	Value *Mirror = Mirrors[V];
-	if (!Mirror) {
-	  assert(V->getType() && isGCPointerType(V->getType()));
-	  // Insert a new AllocaInst at the start of the entry block, following any phi nodes.
-	  IRBuilder<> IRB(&*F.getEntryBlock().getFirstInsertionPt());
-	  Mirror = IRB.CreateAlloca(V->getType(), nullptr, "mirror");
-	  Mirrors[V] = Mirror;
-	}	
-
-	// Save a copy of the value into the mirror.
-	IRBuilder<> IRB(Inst);
-	IRB.CreateStore(I, Mirror);
+      // Save a copy of the value into the mirror.
+      IRBuilder<> IRB(Inst);
+      IRB.CreateStore(V, Mirror, true);	// volatile
 	
 #ifdef ANNOTATE_MIRROR_LIFETIMES
-	// Annotate the mirror with the start of its lifetime.
-	Module *M = F.getParent();
-	LLVMContext &Ctx = M->getContext();	
-	auto LifetimeStart = Intrinsic::getDeclaration(M, Intrinsic::lifetime_start);
-	auto *I8Ptr = Type::getInt8Ty(Ctx)->getPointerTo();
-	auto *BufPtr = IRB.CreateBitCast(Mirror, I8Ptr, "mirror_lifetime_bitcast");
-	auto *BufSize = ConstantInt::get(Ctx, APInt(32, int32bytes));
-	IRB.CreateCall(LifetimeStart, {BufSize, BufPtr});
+      // Annotate the mirror with the start of its lifetime.
+      Module *M = F.getParent();
+      LLVMContext &Ctx = M->getContext();	
+      auto LifetimeStart = Intrinsic::getDeclaration(M, Intrinsic::lifetime_start);
+      assert(LifetimeStart);      
+      auto *I8Ptr = Type::getInt8Ty(Ctx)->getPointerTo();
+      auto *BufPtr = IRB.CreateBitCast(Mirror, I8Ptr, "mirror_lifetime_bitcast");
+      auto *BufSize = ConstantInt::get(Ctx, APInt(64, int32bytes));
+      IRB.CreateCall(LifetimeStart, {BufSize, BufPtr});
 #endif
-	MadeChange = true;
-      } else {
-	assert(!"bad instruction in live set");
-      }
+
+      MadeChange = true;
     }
   }
 
@@ -313,6 +308,7 @@ static bool walkDominatorTree(DominatorTree &DT, Function &F)
       Module *M = F.getParent();
       LLVMContext &Ctx = M->getContext();
       auto LifetimeEnd = Intrinsic::getDeclaration(M, Intrinsic::lifetime_end);
+      assert(LifetimeEnd);
       auto *I8Ptr = Type::getInt8Ty(Ctx)->getPointerTo();
 
       if (Inst->isTerminator()) {
@@ -322,7 +318,7 @@ static bool walkDominatorTree(DominatorTree &DT, Function &F)
 	  Instruction* InsertPt = &*Succ->getFirstInsertionPt();  // skip phi nodes
 	  IRBuilder<> IRB(InsertPt);
 	  auto *BufPtr = IRB.CreateBitCast(Mirror, I8Ptr, "mirror_lifetime_bitcast");
-	  auto *BufSize = ConstantInt::get(Ctx, APInt(32, int32bytes));
+	  auto *BufSize = ConstantInt::get(Ctx, APInt(64, int32bytes));
 	  IRB.CreateCall(LifetimeEnd, {BufSize, BufPtr});	    
 	}
       } else {
@@ -344,7 +340,7 @@ static bool walkDominatorTree(DominatorTree &DT, Function &F)
 
 	IRBuilder<> IRB(InsertPt);
 	auto *BufPtr = IRB.CreateBitCast(Mirror, I8Ptr, "mirror_lifetime_bitcast");
-	auto *BufSize = ConstantInt::get(Ctx, APInt(32, int32bytes));
+	auto *BufSize = ConstantInt::get(Ctx, APInt(64, int32bytes));
 	IRB.CreateCall(LifetimeEnd, {BufSize, BufPtr});
       }
 
@@ -358,7 +354,7 @@ static bool walkDominatorTree(DominatorTree &DT, Function &F)
 
 bool MakeStackTraceable::runOnFunction(Function &F) {
 
-#ifdef TRACE_MIRROR_LIFETIMES
+#if defined TRACE_MIRROR_LIFETIMES || defined DUMP_FINAL_IR
   dbgs() << "MakeStackTraceable: ";
   dbgs().write_escaped(F.getName()) << '\n';
 #endif
@@ -385,12 +381,9 @@ bool MakeStackTraceable::runOnFunction(Function &F) {
   DTW.runOnFunction(F);
   DominatorTree &DT = DTW.getDomTree();
 
-  //  if (HasUnreachableStatepoint)
-  //    MadeChange |= removeUnreachableBlocks(F);
-
   MadeChange |= walkDominatorTree(DT, F);
 
-#if 0
+#ifdef DUMP_FINAL_IR  
   dbgs() << "Final IR after MakeStackTraceable pass:\n";
   for (BasicBlock &BB : F)
     dbgs() << BB << "\n";
@@ -572,7 +565,7 @@ static void computeGCPtrLivenessData(DominatorTree &DT, Function &F, GCPtrLivene
     checkBasicSSA(DT, Data, BB);
 #endif
 
-#if 0
+#ifdef TRACE_LIVENESS
   // Dump blocks and computed liveness data for diagnostic purposes.
   for (BasicBlock &BB : F) {
     dbgs() << "Block:\n";
@@ -599,8 +592,9 @@ static void findLiveSetAtInst(Instruction *Inst, GCPtrLivenessData &Data,
   // Note: The copy is intentional and required.
   assert(Data.LiveOut.count(BB));
   SetVector<Value *> LiveOut = Data.LiveOut[BB];
-  BasicBlock::reverse_iterator rend(Inst->getIterator());
-  computeLiveInValues(BB->rbegin(), rend, LiveOut);
+  // Unlike the code we cribbed here from RewriteStatepointsforGC,
+  // we *do* want to include values used by 'Inst'.
+  computeLiveInValues(BB->rbegin(), Inst->getIterator().getReverse(), LiveOut);  
   LiveOut.remove(Inst);
   Out.insert(LiveOut.begin(), LiveOut.end());
 }

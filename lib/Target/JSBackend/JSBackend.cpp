@@ -4250,12 +4250,16 @@ void JSWriter::calculateNativizedVars(const Function *F) {
           const Instruction *U = dyn_cast<Instruction>(*UI);
           if (!U) { Fail = true; break; } // not an instruction, not cool
           switch (U->getOpcode()) {
-            case Instruction::Load: break; // load is cool
-            case Instruction::Store: {
-              if (U->getOperand(0) == I) Fail = true; // store *of* it is not cool; store *to* it is fine
-              break;
-            }
-            default: { Fail = true; break; } // anything that is "not" "cool", is "not cool"
+	    case Instruction::Load: {
+	      if (dyn_cast<LoadInst>(U)->isVolatile()) Fail = true;
+	      break; // non-volatile load is cool
+	    }
+	    case Instruction::Store: {
+	      if (U->getOperand(0) == I) Fail = true; // store *of* it is not cool; store *to* it is fine
+	      if (dyn_cast<StoreInst>(U)->isVolatile()) Fail = true; // volatile store is not cool
+	      break;
+	    }
+	    default: { Fail = true; break; } // anything that is "not" "cool", is "not cool"
           }
         }
         if (!Fail) NativizedVars.insert(I);
